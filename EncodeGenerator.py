@@ -2,6 +2,16 @@ import cv2
 import face_recognition
 import pickle
 import os
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+from firebase_admin import storage
+
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': "https://realtimecriminaldetection-default-rtdb.firebaseio.com/",
+    'storageBucket': "realtimecriminaldetection.appspot.com"
+})
 
 #Importing Criminal Images
 folderPath = 'Images'
@@ -15,6 +25,12 @@ for path in PathList:
     #print(path)
     #print(os.path.splitext(path)[0])
     CriminalIds.append(os.path.splitext(path)[0])
+    
+    fileName = f'{folderPath}/{path}'
+    bucket = storage.bucket()
+    blob = bucket.blob(fileName)
+    blob.upload_from_filename(fileName)
+    
 print(CriminalIds)
 
 def findEncodings(imagesList):
