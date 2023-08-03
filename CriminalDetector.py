@@ -24,7 +24,7 @@ cap.set(4, 480)
 
 imgBackground = cv2.imread('Resources/background.png')
 
-#Importing images
+# Importing images
 folderModePath = 'Resources/Modes'
 modePathList = os.listdir(folderModePath)
 imgModeList = []
@@ -32,15 +32,17 @@ for path in modePathList:
     full_path = os.path.join(folderModePath, path)
     imgModeList.append(cv2.imread(full_path))
 
-#load the encoding file
+# Load the face encoding file
 print("Loading Encode File...")
 file = open('EncodeFile.p', 'rb')
 encodeListKnownWithIds = pickle.load(file)
 file.close()
 encodeListKnown, CriminalIds = encodeListKnownWithIds
-#print(CriminalIds)
 print("Encode File Loaded")
 
+# Load the GIF file
+gif_file_path = 'Resources/ModeMap/mapmode.gif'
+gif_capture = cv2.VideoCapture(gif_file_path)
 
 modeType = 0
 counter = 0
@@ -49,37 +51,46 @@ imgCriminal = []
 
 while True:
     success, img = cap.read()
-    
+
     imgS = cv2.resize(img, (0, 0), None, 0.25, 0.25)
     imgS = cv2.cvtColor(imgS, cv2.COLOR_BGR2RGB)
-    
+
     faceCurFrame = face_recognition.face_locations(imgS)
     encodeCurFrame = face_recognition.face_encodings(imgS, faceCurFrame)
-    
+
     imgBackground[162:162 + 480, 55:55 + 640] = img
     imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
-    
-    
+
+    criminal_detected = False  # Flag to indicate if a criminal is detected
+
     for encodeFace, faceLoc in zip(encodeCurFrame, faceCurFrame):
         matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
         faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
-        #print("matches", matches)
-        #print("FaceDis", faceDis)
-        
+
         matchIndex = np.argmin(faceDis)
-        #print("Match Index", matchIndex)
-        
+
         if matches[matchIndex]:
-            #print("Wanted Criminal Detected")
-            #print(CriminalIds[matchIndex])
             y1, x2, y2, x1 = faceLoc
             y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
             bbox = 55 + x1, 162 + y1, y2 - y1, x2 - x1  # Swap h and w
             imgBackground = cvzone.cornerRect(imgBackground, bbox, rt=0)
-            id = CriminalIds[matchIndex]           
+            id = CriminalIds[matchIndex]
+
             if counter == 0:
                 counter = 1
                 modeType = 1
+
+            criminal_detected = True  # Set the flag to indicate a criminal is detected
+
+    if criminal_detected:
+        # Display the GIF frames on imgBackground
+        ret, gif_frame = gif_capture.read()
+        if ret:
+            gif_frame = cv2.resize(gif_frame, (500, 500))
+            imgBackground[100:600, 100:600] = gif_frame
+    else:
+        # If no criminal detected, set the GIF area to a blank frame
+        imgBackground[100:300, 100:300] = np.zeros((200, 200, 3), dtype=np.uint8)
                 
     if counter!= 0:
         

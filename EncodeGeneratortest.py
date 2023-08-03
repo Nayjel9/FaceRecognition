@@ -1,58 +1,74 @@
+import tkinter as tk
+from tkinter import ttk, filedialog
+from tkinter import messagebox
 import cv2
 import face_recognition
 import pickle
 import os
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import db
-from firebase_admin import storage
-from tkinter import ttk
-from tkinter import messagebox
-import tkinter as tk
+from firebase_admin import credentials, storage, db
 
-# Initialize Firebase Admin SDK
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
     'databaseURL': "https://realtimecriminaldetection-default-rtdb.firebaseio.com/",
     'storageBucket': "realtimecriminaldetection.appspot.com"
 })
 
-# Importing Criminal Images
-folderPath = 'Images'
-PathList = os.listdir(folderPath)
-imgList = []
-CriminalIds = []
+storage_bucket = storage.bucket()
+ref = db.reference('Criminals')
 
-for path in PathList:
-    full_path = os.path.join(folderPath, path)
-    imgList.append(cv2.imread(full_path))
-    CriminalIds.append(os.path.splitext(path)[0])
+# Function to perform face encoding and upload images to Firebase Storage
+def perform_face_encoding_and_upload():
+    folderPath = 'Images'
+    PathList = os.listdir(folderPath)
+    print(PathList)
+    imgList = []
+    CriminalIds = []
+    for path in PathList:
+        full_path = os.path.join(folderPath, path)
+        imgList.append(cv2.imread(full_path))
+        CriminalIds.append(os.path.splitext(path)[0])
 
-    # Upload the image to Firebase Storage
-    fileName = f'{folderPath}/{path}'
-    bucket = storage.bucket()
-    blob = bucket.blob(fileName)
-    blob.upload_from_filename(fileName)
+        fileName = f'{folderPath}/{path}'
+        blob = storage_bucket.blob(fileName)
+        blob.upload_from_filename(fileName)
 
-def findEncodings(imagesList):
-    encodeList = []
-    for img in imagesList:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        encode = face_recognition.face_encodings(img)[0]
-        encodeList.append(encode)
-    return encodeList
+    print(CriminalIds)
 
-print("Encoding Started...")
-encodeListKnown = findEncodings(imgList)
-encodeListKnownWithIds = [encodeListKnown, CriminalIds]
-print("Encoding Complete")
+    def findEncodings(imagesList):
+        encodeList = []
+        for img in imagesList:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            encode = face_recognition.face_encodings(img)[0]
+            encodeList.append(encode)
 
-# Save the facial encodings to a file
-file = open("EncodeFile.p", 'wb')
-pickle.dump(encodeListKnownWithIds, file)
-file.close()
-print("File Saved")
+        return encodeList
 
+    print("Encoding Started...")
+    encodeListKnown = findEncodings(imgList)
+    encodeListKnownWithIds = [encodeListKnown, CriminalIds]
+    print("Encoding Complete")
+
+    file = open("EncodeFile.p", 'wb')
+    pickle.dump(encodeListKnownWithIds, file)
+    file.close()
+    print("File Saved")
+
+    # After encoding is complete, show a notification
+    show_notification("Face encoding complete and images have been uploaded to the databse.")
+
+def browse_png_file():
+    selected_file = filedialog.askopenfilename(filetypes=[("PNG files", "*.png")])
+    if selected_file:
+        upload_png_file(selected_file)
+
+def upload_png_file(png_file_path):
+    file_name = png_file_path.split("/")[-1]
+    blob = storage_bucket.blob(f"Images/{file_name}")  # Upload to "Images/" directory
+    blob.upload_from_filename(png_file_path)
+    show_notification(f"The PNG file '{file_name}' has been uploaded to 'Images/' directory in Firebase Storage.")
+
+# Rest of the Tkinter GUI code
 def submit_data():
     criminal_id = entry_id.get()
     name = entry_name.get()
@@ -65,11 +81,9 @@ def submit_data():
         "date_and_time_detected": date_time_detected
     }
 
-    # Store the criminal data in the Firebase Realtime Database
-    ref = db.reference('Criminals')
     ref.child(criminal_id).set(data)
     reset_fields()
-    show_notification()
+    show_notification("Another criminal has been added to the database.")
 
 def reset_fields():
     entry_id.delete(0, tk.END)
@@ -77,13 +91,12 @@ def reset_fields():
     entry_criminal_no.delete(0, tk.END)
     entry_date_time.delete(0, tk.END)
 
-def show_notification():
-    messagebox.showinfo("Notification", "Another criminal has been added to the database.")
+def show_notification(message):
+    messagebox.showinfo("Notification", message)
 
 app = tk.Tk()
-app.title("Facial Recognition and Criminal Data Entry")
+app.title("Add Criminal Data and Upload Directory")
 
-# Create GUI widgets
 label_id = ttk.Label(app, text="Criminal ID:")
 entry_id = ttk.Entry(app)
 
@@ -98,7 +111,6 @@ entry_date_time = ttk.Entry(app)
 
 submit_button = ttk.Button(app, text="Submit", command=submit_data)
 
-# Arrange the widgets on the window using grid layout
 label_id.grid(row=0, column=0)
 entry_id.grid(row=0, column=1)
 
@@ -113,37 +125,7 @@ entry_date_time.grid(row=3, column=1)
 
 submit_button.grid(row=4, column=0, columnspan=2)
 
-# Real-time Criminal Detection using Face Recognition
-cap = cv2.VideoCapture(0)
+face_encoding_button = ttk.Button(app, text="Start Encoding and Upload", command=perform_face_encoding_and_upload)
+face_encoding_button.grid(row=7, column=0, columnspan=2)
 
-while True:
-    ret, frame = cap.read()
-    frame = cv2.resize(frame, (1280, 720))
-
-    # Face recognition
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(rgb_frame)
-    face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-
-    # Match faces with known criminals
-    for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-        matches = face_recognition.compare_faces(encodeListKnownWithIds[0], face_encoding)
-        name = "Unknown"
-
-        if True in matches:
-            matched_index = matches.index(True)
-            name = encodeListKnownWithIds[1][matched_index]
-
-        # Draw a rectangle around the face and display the name
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-        font = cv2.FONT_HERSHEY_DUPLEX
-        cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
-
-    cv2.imshow("Real-time Criminal Detection", frame)
-
-    if cv2.waitKey(1) & 0xFF == 27:
-        break
-
-cap.release()
-cv2.destroyAllWindows()
 app.mainloop()
