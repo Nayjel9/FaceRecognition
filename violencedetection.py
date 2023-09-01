@@ -10,7 +10,7 @@ violence_model = tf.keras.models.load_model('VModel/modelnew.h5')
 yolov5_model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
 
 def detect_and_box_violence_camera():
-    cap = cv2.VideoCapture('2.mp4')  # Use the default camera (you can specify a different camera index if needed)
+    cap = cv2.VideoCapture(0)  # Use the default camera (you can specify a different camera index if needed)
 
     while True:
         ret, frame = cap.read()
