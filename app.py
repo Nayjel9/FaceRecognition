@@ -26,7 +26,7 @@ firebase_admin.initialize_app(cred, {
 bucket = storage.bucket()
 
 # Load the YOLOv5 model
-path = 'model/best.pt'
+path = 'model/bestv2.pt'
 model = torch.hub.load('ultralytics/yolov5', 'custom', path, force_reload=True)
 
 # Initialize the webcam
