@@ -15,10 +15,11 @@ from tkinter import ttk
 from tkinter import messagebox
 from flask import Flask, render_template, Response, request, redirect, url_for
 from flask import Flask
+from yolov5.models.experimental import attempt_load
+from yolov5.utils.general import non_max_suppression
 import serial
 
-# Initialize the serial connection
-ser = serial.Serial('COM1', 9600)  # Replace 'COM1' with the correct serial port
+ser = serial.Serial('COM5', 9600)
 
 # Load Firebase credentials and initialize the app
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -61,6 +62,9 @@ imgCriminal = []
 # Flask app initialization
 app = Flask(__name__)
 
+def control_siren(command):
+    ser.write(command.encode())
+
 # Create a dummy login check function for demonstration purposes
 def check_login(username, password):
     return username == "123456" and password == "123456"
@@ -87,39 +91,41 @@ def gen():
         frame = cv2.resize(frame, (640, 480))
         results = model(frame)
         frame = np.squeeze(results.render())
-        
+
         imgS = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
         imgS = cv2.cvtColor(imgS, cv2.COLOR_BGR2RGB)
-        
+
         faceCurFrame = face_recognition.face_locations(imgS)
         encodeCurFrame = face_recognition.face_encodings(imgS, faceCurFrame)
-        
+
         imgBackground[162:162 + 480, 55:55 + 640] = frame
         imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
-        
+
         # Criminal detection code
         for encodeFace, faceLoc in zip(encodeCurFrame, faceCurFrame):
-            for encodeFace, faceLoc in zip(encodeCurFrame, faceCurFrame):
-                matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
-                faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
-            
-                matchIndex = np.argmin(faceDis)
-            
-            if matches[matchIndex]:
-        # ... (Your existing code for criminal detection)
-                ser.write(b'1')  # Send signal to Arduino to turn on the relay (light up the bulb)
-            else:
-                ser.write(b'0')  # Send signal to Arduino to turn off the relay (shut off the bulb)
-            
+            matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
+            faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
+
+            matchIndex = np.argmin(faceDis)
+
             if matches[matchIndex]:
                 y1, x2, y2, x1 = faceLoc
                 y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
                 bbox = 55 + x1, 162 + y1, y2 - y1, x2 - x1  # Swap h and w
                 imgBackground = cvzone.cornerRect(imgBackground, bbox, rt=0)
-                id = CriminalIds[matchIndex]           
+                id = CriminalIds[matchIndex]
                 if counter == 0:
                     counter = 1
                     modeType = 1
+                    control_siren('ON')
+            else:
+                # If the face is not recognized from the database, add "Unknown" label and draw a red box
+                y1, x2, y2, x1 = faceLoc
+                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                cv2.rectangle(imgBackground, (55 + x1, 162 + y1), (55 + x2, 162 + y2), (0, 0, 255), 2)
+                cv2.putText(imgBackground, "Civilian", (55 + x1 + 6, 162 + y1 - 6),
+                            cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
+                control_siren('OFF')
                     
         if counter != 0:
             
