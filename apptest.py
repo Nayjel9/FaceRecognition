@@ -15,8 +15,6 @@ from tkinter import ttk
 from tkinter import messagebox
 from flask import Flask, render_template, Response, request, redirect, url_for
 from flask import Flask
-from yolov5.models.experimental import attempt_load
-from yolov5.utils.general import non_max_suppression
 import serial
 
 ser = serial.Serial('COM5', 9600)
