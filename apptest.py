@@ -16,8 +16,7 @@ from tkinter import messagebox
 from flask import Flask, render_template, Response, request, redirect, url_for
 from flask import Flask
 import serial
-
-ser = serial.Serial('/dev/ttyUSB0', 9600)
+import time
 
 # Load Firebase credentials and initialize the app
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -29,7 +28,7 @@ firebase_admin.initialize_app(cred, {
 bucket = storage.bucket()
 
 # Load the YOLOv5 model
-path = 'model/best.pt'
+path = 'model/bestv2.pt'
 model = torch.hub.load('ultralytics/yolov5', 'custom', path, force_reload=True)
 
 # Initialize the webcam
@@ -60,26 +59,35 @@ imgCriminal = []
 # Flask app initialization
 app = Flask(__name__)
 
-def control_siren(command):
-    ser.write(command.encode())
-
 # Create a dummy login check function for demonstration purposes
 def check_login(username, password):
     return username == "123456" and password == "123456"
 
-# Login page
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        police_number = request.form['police_number']
-        password = request.form['password']
-        
-        # Perform the check_login function here to validate the credentials
-        if check_login(police_number, password):
-            return redirect(url_for('index'))
-        else:
-            return render_template('login.html', error="Invalid credentials. Please try again.")
-    return render_template('login.html')
+# Serial port for communicating with the Arduino
+ser = serial.Serial('COM3', 9600)  # Change 'COM3' to your Arduino's serial port
+
+# Send a command to turn the relay on
+def turn_relay_on():
+    ser.write(b'a')
+
+# Send a command to turn the relay off
+def turn_relay_off():
+    ser.write(b'b')
+
+# Keyboard input handler
+def keyboard_input_handler():
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('o'):
+            turn_relay_on()
+        elif key == ord('f'):
+            turn_relay_off()
+
+# Start a separate thread to handle keyboard input
+import threading
+input_thread = threading.Thread(target=keyboard_input_handler)
+input_thread.daemon = True
+input_thread.start()
 
 def gen():
     global imgBackground, modeType, counter, id, imgCriminal
@@ -115,7 +123,6 @@ def gen():
                 if counter == 0:
                     counter = 1
                     modeType = 1
-                    control_siren('ON')
             else:
                 # If the face is not recognized from the database, add "Unknown" label and draw a red box
                 y1, x2, y2, x1 = faceLoc
@@ -123,7 +130,6 @@ def gen():
                 cv2.rectangle(imgBackground, (55 + x1, 162 + y1), (55 + x2, 162 + y2), (0, 0, 255), 2)
                 cv2.putText(imgBackground, "Civilian", (55 + x1 + 6, 162 + y1 - 6),
                             cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
-                control_siren('OFF')
                     
         if counter != 0:
             
@@ -165,14 +171,6 @@ def gen():
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
     app.run(host='localhost', port=8000, debug=True)

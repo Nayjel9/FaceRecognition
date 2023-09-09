@@ -2,7 +2,7 @@ import serial
 import keyboard
 
 # Replace 'COM3' with the actual COM port your Arduino is connected to
-ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+ser = serial.Serial('COM5', 9600)
 
 while True:
     # Check if the 'R' key is pressed
