@@ -2,7 +2,7 @@ import serial
 import time
 
 # Replace with the actual serial port name
-arduino_port = '/dev/ttyACM0'  # Example: '/dev/ttyUSB0'
+arduino_port = 'COM5'  # Example: '/dev/ttyUSB0'
 baud_rate = 9600
 
 try:
