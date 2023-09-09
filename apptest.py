@@ -17,7 +17,7 @@ from flask import Flask, render_template, Response, request, redirect, url_for
 from flask import Flask
 import serial
 
-ser = serial.Serial('COM5', 9600)
+ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 # Load Firebase credentials and initialize the app
 cred = credentials.Certificate("serviceAccountKey.json")
