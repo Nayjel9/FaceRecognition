@@ -1,20 +1,30 @@
-int relayPin = 9; // Replace with the appropriate pin number
+// Define the pin connected to the relay
+const int relayPin = 9; // Change this to the actual pin you are using
 
 void setup() {
+  // Initialize the relay pin as an output
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW); // Initial state: Relay is off
+  // Start serial communication at 9600 baud
   Serial.begin(9600);
 }
 
 void loop() {
+  // Check if there is data available to read from the serial port
   if (Serial.available() > 0) {
-    char command = Serial.read();
-    if (command == '1') {
-      digitalWrite(relayPin, LOW); // Turn on the relay
-      Serial.println("Relay is OFF");
-    } else if (command == '0') {
-      digitalWrite(relayPin, HIGH); // Turn off the relay
+    // Read the incoming byte
+    char incomingByte = Serial.read();
+    
+    // Check if the incoming byte is '1' (ASCII value)
+    if (incomingByte == '1') {
+      // Turn on the relay
+      digitalWrite(relayPin, HIGH);
       Serial.println("Relay is ON");
+    } 
+    // Check if the incoming byte is '0' (ASCII value)
+    else if (incomingByte == '0') {
+      // Turn off the relay
+      digitalWrite(relayPin, LOW);
+      Serial.println("Relay is OFF");
     }
   }
 }

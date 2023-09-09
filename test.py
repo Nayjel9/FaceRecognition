@@ -1,29 +1,15 @@
 import serial
-import time
+import keyboard
 
-# Replace with the actual serial port name
-arduino_port = 'COM5'  # Example: '/dev/ttyUSB0'
-baud_rate = 9600
+# Replace 'COM3' with the actual COM port your Arduino is connected to
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 
-try:
-    ser = serial.Serial(arduino_port, baud_rate, timeout=1)
-    print("Connected to Arduino on port:", arduino_port)
-
-    while True:
-        command = input("Enter '1' to turn ON the relay, '0' to turn OFF, or 'q' to quit: ").strip()
-        
-        if command == 'q':
-            break
-        elif command in ('0', '1'):
-            ser.write(command.encode())  # Send the command to Arduino
-            response = ser.readline().decode('utf-8').strip()
-            print("Arduino response:", response)
-        else:
-            print("Invalid command. Enter '0', '1', or 'q'.")
-        
-except serial.SerialException as e:
-    print("Error:", e)
-
-finally:
-    if 'ser' in locals():
-        ser.close()
+while True:
+    # Check if the 'R' key is pressed
+    if keyboard.is_pressed('a'):
+        print("Turning relay ON")
+        ser.write(b'1')  # Send '1' to Arduino to turn on the relay
+    # Check if the 'S' key is pressed
+    elif keyboard.is_pressed('b'):
+        print("Turning relay OFF")
+        ser.write(b'0')  # Send '0' to Arduino to turn off the relay
